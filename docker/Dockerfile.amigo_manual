@@ -1,0 +1,96 @@
+####
+#### This docker file is trying to run and install AmiGO/GOlr
+#### minimally as root on localhost.
+####
+#### Build image with playbooks from this directory:
+####  docker build --tag amigo-image-01 --file /home/sjcarbon/local/src/git/operations/docker/Dockerfile.amigo_manual /home/sjcarbon/local/src/git/operations
+####
+
+## Grab the latest(?) Ubuntu image.
+FROM ubuntu:16.04
+
+## Quiet it down a little bit.
+ENV DEBIAN_FRONTEND noninteractive
+ENV TERM linux
+
+## Get the system updated.
+RUN apt-get update
+#RUN apt-get -y dist-upgrade
+## Small "repairs" for sanity.
+RUN apt-get -y install libterm-readline-gnu-perl
+RUN apt-get -y install apt-utils
+RUN apt-get -y install software-properties-common
+
+## Node.
+RUN apt-get -y install build-essential curl
+RUN curl -sL https://deb.nodesource.com/setup_4.x | bash -
+RUN apt-get install -y nodejs
+
+## Get apache setup as a generic worker.
+RUN apt-get -y install apache2 
+RUN a2dismod mpm_event mpm_worker
+RUN a2enmod mpm_prefork
+RUN a2dismod cgid mpm_event mpm_worker
+RUN a2enmod alias mpm_prefork cgi rewrite proxy proxy_http proxy_html macro headers xml2enc
+RUN /etc/init.d/apache2 restart
+
+## Get AmiGO itself installed as a root service directly out of the repo.
+## Based on the (incomplete) instructions in amigo-golr.yml
+## Sanity packages.
+RUN apt-get -y install less mg byobu htop iotop di
+## AmiGO packages.
+RUN apt-get -y install git make kwalify libcgi-application-perl libcgi-application-plugin-session-perl libcgi-application-plugin-tt-perl libcgi-application-server-perl libclone-perl libconfig-yaml-perl libdbi-perl libdbd-sqlite3-perl libdbd-mysql-perl libdata-formvalidator-perl libossp-uuid-perl libfile-type-perl libfile-slurp-perl libfreezethaw-perl libgraph-perl libgraphviz-perl libjson-xs-perl liburi-perl libwww-mechanize-perl libxml-libxml-perl libxml-xpath-perl dh-make-perl
+
+## Grab the AmiGO/GOlr repo and change context.
+RUN mkdir -p /srv
+RUN git clone https://github.com/geneontology/amigo.git --branch master --single-branch /srv/amigo
+WORKDIR /srv/amigo
+RUN git pull
+
+## Get AmiGO configs into place.
+RUN cp /srv/amigo/conf/examples/amigo.yaml.docker /srv/amigo/conf/amigo.yaml
+## AmiGO install.
+RUN npm install
+RUN ./node_modules/.bin/gulp install
+
+## Final Apache setup.
+RUN cp /srv/amigo/conf/examples/apache2.localhost_root.conf /etc/apache2/sites-available/001-inline-amigo.conf
+RUN cp /srv/amigo/conf/examples/apache2.ports.conf /etc/apache2/ports.conf
+RUN a2ensite 001-inline-amigo
+RUN /etc/init.d/apache2 restart
+
+## GOlr setup.
+RUN apt-get -y install jetty9
+RUN cp ./golr/solr/solr.war /var/lib/jetty9/webapps/
+RUN chown jetty /var/lib/jetty9/webapps/solr.war
+RUN chgrp adm /var/lib/jetty9/webapps/solr.war
+RUN cp ./golr/jetty/jetty /etc/default/jetty9
+RUN mkdir -p /srv/solr/data
+RUN mkdir -p /srv/solr/conf
+RUN cp ./golr/solr/conf/schema.xml /srv/solr/conf/schema.xml
+RUN cp ./golr/solr/conf/solrconfig.xml /srv/solr/conf/solrconfig.xml
+RUN chown -R jetty /srv/solr/
+RUN chgrp -R adm /srv/solr/
+## Restart does not work on initial run?
+#RUN /etc/init.d/jetty9 stop
+#RUN /etc/init.d/jetty9 start
+
+# ## Other Dockerfile directives are still valid
+# EXPOSE 80 3400 6800 8080 8910 9000 9999
+# #EXPOSE 80 3400 6800 8080 8910 9000 9999
+EXPOSE 8080
+# #ENTRYPOINT ["/usr/local/bin/apachectl", "-DFOREGROUND"]
+#ENTRYPOINT ["/etc/init.d/jetty9", "start"]
+WORKDIR /usr/share/jetty9
+CMD java -Xmx2g -Djava.awt.headless=true -Dsolr.solr.home=/srv/solr -Djava.io.tmpdir=/tmp -Djava.library.path=/usr/lib -Djetty.home=/usr/share/jetty9 -Djetty.logs=/var/log/jetty9 -Djetty.state=/var/lib/jetty9/jetty.state -jar /usr/share/jetty9/start.jar jetty-logging.xml jetty-started.xml
+
+# ## Get a local solr setup the cheap and easy way.
+# RUN wget http://archive.apache.org/dist/lucene/solr/3.6.2/apache-solr-3.6.2.tgz
+# RUN tar -zxvf apache-solr-3.6.2.tgz
+# RUN mv apache-solr-3.6.2/example/solr/conf apache-solr-3.6.2/example/solr/conf.orig
+# RUN mkdir -p apache-solr-3.6.2/example/solr/conf
+# RUN cp ./golr/solr/conf/schema.xml apache-solr-3.6.2/example/solr/conf
+# RUN cp ./golr/solr/conf/solrconfig.xml apache-solr-3.6.2/example/solr/conf
+
+# JAVA_OPTIONS="-Xmx32g -Djava.awt.headless=true -Dsolr.solr.home=/srv/solr"
+# http://archive.apache.org/dist/lucene/solr/3.6.2/

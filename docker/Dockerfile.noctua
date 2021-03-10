@@ -1,0 +1,28 @@
+####
+#### Build image with playbooks from this directory:
+####  cp Dockerfile.noctua Dockerfile
+####  docker build -t noctua_instance .
+####
+
+## From link provided at: https://github.com/ansible/ansible-docker-base
+FROM williamyeh/ansible:ubuntu16.04-onbuild
+
+## Make an AWS-like ubuntu user. 
+RUN apt-get update
+#RUN apt-get -y install sudo
+#RUN useradd -ms /bin/bash ubuntu && echo "ubuntu:ubuntu" | chpasswd && adduser ubuntu sudo
+#USER ubuntu
+#CMD /bin/bash
+
+## Add playbooks to the Docker image
+ADD . /srv/noctua-ansible/
+WORKDIR /srv/noctua-ansible
+
+## Run Ansible to configure the Docker image
+#RUN ansible-playbook docker-noctua-up.playbook.yaml -c local -u ubuntu
+RUN ansible-playbook docker-bbop-client.playbook.yaml -c local
+RUN ansible-playbook docker-noctua-up.playbook.yaml -c local
+
+## Other Dockerfile directives are still valid
+EXPOSE 80 3400 6800 8080 8910 9000 9999
+#ENTRYPOINT ["/usr/local/bin/apachectl", "-DFOREGROUND"]

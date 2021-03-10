@@ -1,0 +1,33 @@
+
+Welcome to the semi-public operations repository for the GOC. If you
+are reading this, you probably tasked with either adding something to
+the deployment or fixing something that went wrong. Good luck!
+
+The most obvious thing here is that this is based from a very Berkeley
+BOP perspective, where production will be held after the transition--a
+lot of BBOP-only things will be taken for granted (I hope you like
+references to kitchenware). As well, the perspective will be in
+spinning up and maintaining the current pipeline, rather than more
+abstract tooling and recipes, so one should be aware of the
+environment in which various pieces and tasks are to run.
+
+* Things not here
+
+  All keys, passwords, etc. should have been removed, likely to the
+  internal BBOP share in Spideroak.
+
+  As well, the ansible hosts file, while simple, is kept separately.
+
+* Things to remember
+
+  Web server registration
+
+  https://commons.lbl.gov/display/cpp/Web+Server+Registration
+
+* Anisible
+
+See the README in the ansible/ directory.
+
+* Docker
+
+See the README in the docker/ directory.

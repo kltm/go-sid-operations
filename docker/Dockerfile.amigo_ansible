@@ -1,0 +1,58 @@
+####
+#### This dockerfile is attempting to install amigo via generic ansible
+#### internally.
+####
+#### Build image with playbooks from this directory:
+####  docker build --tag amigo-image-01 --file /home/sjcarbon/local/src/git/operations/docker/Dockerfile.amigo_ansible /home/sjcarbon/local/src/git/operations
+####
+
+## Grab the latest(?) Ubuntu image.
+FROM ubuntu:16.04
+
+## Quiet it down a little bit.
+ENV DEBIAN_FRONTEND noninteractive
+ENV TERM linux
+
+## Get the system updated.
+RUN apt-get update
+#RUN apt-get -y dist-upgrade
+## Small "repairs" for sanity.
+RUN apt-get -y install libterm-readline-gnu-perl
+RUN apt-get -y install apt-utils
+RUN apt-get -y install software-properties-common
+
+## Node.
+RUN apt-get -y install build-essential curl
+RUN curl -sL https://deb.nodesource.com/setup_4.x | bash -
+RUN apt-get install -y nodejs
+
+## And Ansible ticking over.
+RUN apt-add-repository ppa:ansible/ansible
+RUN apt-get update
+RUN apt-get -y install ansible python
+
+## Setup the minimal system as we expect--get bbop user minimally setup.
+RUN apt-get -y install sudo
+RUN useradd -ms /bin/bash bbop && echo "bbop:bbop" | chpasswd && adduser bbop sudo
+ADD ./ansible/roles/bbop/files/sudoers.d.bbop /etc/sudoers.d/bbop
+CMD chown root /etc/sudoers.d/bbop
+CMD chgrp root /etc/sudoers.d/bbop
+CMD chmod 0440 /etc/sudoers.d/bbop
+CMD visudo -cf /etc/sudoers.d/bbop
+USER bbop
+#CMD /bin/bash
+
+## Add operations directory and playbooks to the Docker image, get
+## ready to work.
+ADD . /srv/operations/
+WORKDIR /srv/operations/ansible/
+
+# ## Run Ansible to configure the Docker image
+# # #RUN ansible-playbook docker-noctua-up.playbook.yaml -c local -u ubuntu
+# #RUN ansible-playbook docker-bbop-client.playbook.yaml -c local
+RUN sudo ansible-playbook -c local amigo-golr-up.yml --extra-vars "target_host=localhost"
+
+# ## Other Dockerfile directives are still valid
+EXPOSE 80 3400 6800 8080 8910 9000 9999
+# #EXPOSE 80 3400 6800 8080 8910 9000 9999
+# #ENTRYPOINT ["/usr/local/bin/apachectl", "-DFOREGROUND"]
